@@ -1,4 +1,3 @@
-import os
 import random
 import time
 import subprocess
@@ -11,26 +10,32 @@ import dns.query
 import schedule
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO
+import os
 
 app = Flask(__name__)
 socketio = SocketIO(app)
 
 # Definable variables
-DNS_FILE = "dns_urls.json"
-CDN_FILE = "cdn_services.json"
-WEBSITE_DIRECTORY = "/path/to/your/website/directory"
+HTTP_SERVER_DIRECTORY = '/path/to/your/website/directory'
 HTTP_SERVER_PORT = 8000
-DUCKDNS_CREDENTIALS = "/path/to/duckdns.ini"
-DUCKDNS_TOKEN = "your-duck-dns-token"
+DUCKDNS_CREDENTIALS_PATH = '/path/to/duckdns.ini'
+DUCKDNS_TOKEN = 'your-duck-dns-token'
+WEBSITE_ADDRESS = 'http://your_website_address'
 SAMPLE_DOMAINS = ["example1.com", "example2.com", "example3.com"]
 
-# Load DNS URLs from JSON file
-with open(DNS_FILE, "r") as dns_file:
-    dns_urls = json.load(dns_file)
+# Sample database of CDN services and their cached times (in hours)
+cdn_services = {
+    "CDN1": {"cached_time": 24, "url": "https://cdn1.example.com"},
+    "CDN2": {"cached_time": 48, "url": "https://cdn2.example.com"},
+    # Add more CDN services as needed
+}
 
-# Load CDN services from JSON file
-with open(CDN_FILE, "r") as cdn_file:
-    cdn_services = json.load(cdn_file)
+# Sample DNS URLs
+dns_urls = {
+    "ns1": "ns1.example.com",
+    "ns2": "ns2.example.com",
+    # Add more DNS URLs as needed
+}
 
 # HTML code for a basic webpage
 html_code = """
@@ -105,7 +110,7 @@ def send_alert(message):
 # Function to obtain SSL certificate using Certbot
 def obtain_ssl_certificate(domain):
     try:
-        subprocess.run(['certbot', 'certonly', '--dns-duckdns', '--dns-duckdns-credentials', DUCKDNS_CREDENTIALS, '-d', domain])
+        subprocess.run(['certbot', 'certonly', '--dns-duckdns', '--dns-duckdns-credentials', DUCKDNS_CREDENTIALS_PATH, '-d', domain])
         return True
     except Exception as e:
         print(f"Error obtaining SSL certificate: {e}")
@@ -138,15 +143,11 @@ def start_http_server(directory, port):
 
 # Function to publish the website to the I2P network
 def publish_to_i2p():
-    # Replace 'your_website_address' with the actual address of your website
-    website_address = 'http://your_website_address'
-    requests.get('http://127.0.0.1:7657/i2psnark?add='+website_address)
+    requests.get('http://127.0.0.1:7657/i2psnark?add='+WEBSITE_ADDRESS)
 
 # Function to index the website on the I2P network
 def index_website():
-    # Replace 'your_website_address' with the actual address of your website
-    website_address = 'http://your_website_address'
-    requests.get('http://stats.i2p/cgi-bin/new-addr?url='+website_address)
+    requests.get('http://stats.i2p/cgi-bin/new-addr?url='+WEBSITE_ADDRESS)
 
 # Function to periodically update CDN cache
 def update_cdn_cache():
@@ -181,5 +182,13 @@ def update_dns_records():
 def serve_i2p_site():
     # Your logic to open the i2p site via Chromium headless and deliver the requested static version
     return "<h1>This is the i2p site content</h1>"
+schedule.every().day.at(“00:00”).do(update_cdn_cache)
+schedule.every().hour.do(generate_ssl_certs)
+schedule.every().hour.do(update_dns_records)
+
+Main loop to continuously run the scheduler
+
+if name == ‘main’:
+socketio.run(app)
 
 # Schedule the jobs
